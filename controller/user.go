@@ -538,27 +538,52 @@ func UpdateSelf(c *gin.Context) {
 		})
 		return
 	}
-	if user.Password == "" {
-		user.Password = "$I_LOVE_U" // make Validator happy :)
-	}
-	if err := common.Validate.Struct(&user); err != nil {
-		c.JSON(http.StatusOK, gin.H{
-			"success": false,
-			"message": "输入不合法 " + err.Error(),
-		})
-		return
-	}
-
-	cleanUser := model.User{
-		Id:          c.GetInt("id"),
-		Username:    user.Username,
-		Password:    user.Password,
-		DisplayName: user.DisplayName,
-	}
-	if user.Password == "$I_LOVE_U" {
-		user.Password = "" // rollback to what it should be
-		cleanUser.Password = ""
-	}
+func UpdateSelf(c *gin.Context) {  
+    var user model.User  
+    err := json.NewDecoder(c.Request.Body).Decode(&user)  
+    if err != nil {  
+        c.JSON(http.StatusBadRequest, gin.H{  
+            "success": false,  
+            "message": "无效的请求数据",  
+        })  
+        return  
+    }  
+  
+    // 移除魔法字符串，使用更安全的验证方式  
+    passwordEmpty := user.Password == ""  
+      
+    if err := common.Validate.Struct(&user); err != nil {  
+        // 如果密码为空且验证失败，检查是否只是密码字段的问题  
+        if passwordEmpty {  
+            // 创建临时用户对象进行验证，排除密码字段  
+            tempUser := user  
+            tempUser.Password = "temp_password_for_validation"  
+            if tempErr := common.Validate.Struct(&tempUser); tempErr != nil {  
+                c.JSON(http.StatusOK, gin.H{  
+                    "success": false,  
+                    "message": "输入不合法 " + err.Error(),  
+                })  
+                return  
+            }  
+        } else {  
+            c.JSON(http.StatusOK, gin.H{  
+                "success": false,  
+                "message": "输入不合法 " + err.Error(),  
+            })  
+            return  
+        }  
+    }  
+  
+    cleanUser := model.User{  
+        Id:          c.GetInt("id"),  
+        Username:    user.Username,  
+        DisplayName: user.DisplayName,  
+    }  
+      
+    // 只有当密码不为空时才设置密码  
+    if !passwordEmpty {  
+        cleanUser.Password = user.Password  
+    }
 	updatePassword := user.Password != ""
 	if err := cleanUser.Update(updatePassword); err != nil {
 		c.JSON(http.StatusOK, gin.H{
