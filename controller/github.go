@@ -198,10 +198,26 @@ func GitHubBind(c *gin.Context) {
 		})
 		return
 	}
-	session := sessions.Default(c)
-	id := session.Get("id")
-	// id := c.GetInt("id")  // critical bug!
-	user.Id = id.(int)
+func GitHubBind(c *gin.Context) {  
+    session := sessions.Default(c)  
+    idInterface := session.Get("id")  
+    if idInterface == nil {  
+        c.JSON(http.StatusBadRequest, gin.H{  
+            "success": false,  
+            "message": "用户未登录",  
+        })  
+        return  
+    }  
+      
+    id, ok := idInterface.(int)  
+    if !ok {  
+        c.JSON(http.StatusInternalServerError, gin.H{  
+            "success": false,  
+            "message": "用户ID类型错误",  
+        })  
+        return  
+    }  
+        user.Id = id
 	err = user.FillUserById()
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
