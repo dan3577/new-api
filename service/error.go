@@ -50,38 +50,15 @@ func OpenAIErrorWrapperLocal(err error, code string, statusCode int) *dto.OpenAI
 	return openaiErr
 }
 
-func RelayErrorHandler(resp *http.Response) (errWithStatusCode *dto.OpenAIErrorWithStatusCode) {
-	errWithStatusCode = &dto.OpenAIErrorWithStatusCode{
-		StatusCode: resp.StatusCode,
-		Error: dto.OpenAIError{
-			Type:  "upstream_error",
-			Code:  "bad_response_status_code",
-			Param: strconv.Itoa(resp.StatusCode),
-		},
-	}
-	responseBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return
-	}
-	err = resp.Body.Close()
-	if err != nil {
-		return
-	}
-	var errResponse dto.GeneralErrorResponse
-	err = json.Unmarshal(responseBody, &errResponse)
-	if err != nil {
-		return
-	}
-	if errResponse.Error.Message != "" {
-		// OpenAI format error, so we override the default one
-		errWithStatusCode.Error = errResponse.Error
-	} else {
-		errWithStatusCode.Error.Message = errResponse.ToMessage()
-	}
-	if errWithStatusCode.Error.Message == "" {
-		errWithStatusCode.Error.Message = fmt.Sprintf("bad response status code %d", resp.StatusCode)
-	}
-	return
+func cacheSetUserName(userId int, username string) {  
+    if !common.RedisEnabled {  
+        return  
+    }  
+    key := fmt.Sprintf("user_name:%d", userId)  
+    err := common.RedisSet(key, username, time.Duration(UserId2UsernameCacheSeconds)*time.Second)  
+    if err != nil {  
+        common.SysError("Redis set user name error: " + err.Error()) // 修正错误信息  
+    }  
 }
 
 func ResetStatusCode(openaiErr *dto.OpenAIErrorWithStatusCode, statusCodeMappingStr string) {
